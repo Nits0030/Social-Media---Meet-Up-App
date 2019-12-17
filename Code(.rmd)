@@ -1,0 +1,175 @@
+#RSCRIPT FOR ANOVA-TEST  ON MEETUP DATASET 
+
+## Loading libraries required and reading the data into R
+
+library(knitr)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tibble)
+library(stringr)
+library(gridExtra)
+library(scales)
+library(lubridate)
+library(ggrepel)
+library(leaflet)
+library(rgdal)
+library(plotly)
+
+## installing packages for SQL
+
+install.packages("RMySQL")
+library(RMySQL)
+
+
+## To connect , using dbConnect() function:
+
+con=dbConnect(MySQL(),
+              user='awsbigdata',password= "bigdata123",
+              dbname = 'Social',host='aws.c0cy2sgqhaev.us-east-1.rds.amazonaws.com')
+
+
+
+## Import Meetup data into the new meetup table
+
+result = dbSendQuery(con,"SELECT * FROM meetup")
+
+## store the result and fetches all of the records
+
+df = fetch(result, n = -1)
+print(df)
+
+
+## COunt of accounts created by Year& quarter
+
+df$year <- year(df$created) 
+
+p <-df%>%ggplot(aes(x=as.factor(year))) + geom_bar(stat='count', fill=rainbow(16)) +
+        geom_label(stat = "count", aes(label = ..count.., y = ..count..))+ 
+  labs(x = "Year" , y = "Count", title= "Total No of Members by Year")
+p
+
+## COunts of accounts created under Category by Quarter
+
+df$quarter <- quarter(df$created) #extract Quarters from created
+
+q1 <- df %>% filter(year>=2006)%>% select(year, quarter) %>% group_by(year) %>% count(quarter) %>%
+        ggplot(aes(x=as.factor(quarter), y=n)) + geom_bar(stat='identity', fill= topo.colors(48)) +
+        facet_wrap(.~year, ncol= 4) + labs(x='Quarter', y='Count ') +
+  labs(x = "Year" , y = "Count", title= "Total No of Members by Quarter") 
+q1
+
+### COunt of Categories & group 
+## Categories in Meet up
+
+df %>% count(category) %>% top_n(33, wt=n) %>%
+        ggplot(aes(x=reorder(category, n), y=n)) +
+        geom_bar(stat='identity', fill= topo.colors(33)) +
+        coord_flip() + labs(x=' Category', y='Count',title = ' Count of Groups by category')
+
+
+## Top 3 category 
+df %>% count(category) %>% top_n(3, wt=n) %>%
+        ggplot(aes(x=reorder(category, n), y=n)) +
+        geom_bar(stat='identity', fill= cm.colors(3)) +
+        coord_flip() + labs(x=' Category', y='Count of Category',title = ' Category Group')
+  
+
+
+## Memeber count by State
+
+summary_members <- df %>%
+                           group_by(state)%>%
+                           summarize(number = sum(members, na.rm = TRUE))
+summary_members
+
+### Sum of Members by state being registered  
+
+##Count of members by state
+
+##PIE Charts
+
+p1 <- ggplot(data=summary_members,mapping = aes(x="",y=number,fill=state))+
+  geom_bar(width = 1,stat = "identity",color="black")+
+  scale_y_sqrt()+
+  theme_classic()+theme(axis.line = element_blank(),axis.text = element_blank())+
+  geom_text(aes(label = paste0(number)), position = position_stack(vjust = 0.5),color="white")+
+  xlab("")+
+  ylab("")
+p1
+pie_slice= p1 +coord_polar("y",start = 0)
+pie_slice
+
+
+## Count of categories  by all state 
+
+StateCount <- subset(df, state == "NY"|state == "CA"|state =="IL"|state == "NJ", select = c(state, category,members))
+p <-ggplot(data = StateCount, mapping = aes(y = state, x = as.factor(category)))+ coord_flip()+
+  geom_bar(stat='identity',fill = topo.colors(16330)) + labs(x = 'Count of Category',y = " ", title = "Category count by state")
+   +facet_wrap(~state, ncol= 4) 
+
+p
+
+## CREATING GROUPS FOR ANALYSIS   
+## Band Variable based on category
+
+SumbyCategory$Band[SumbyCategory$sumofmembers >= 750000] <- 'High'
+SumbyCategory$Band [SumbyCategory$sumofmembers > 200000 & SumbyCategory$sumofmembers < 750000 ] <-'Medium'
+SumbyCategory$Band [SumbyCategory$sumofmembers < 200000] <- 'Low'
+head(SumbyCategory)
+
+#### calculating the mean for the Band
+  
+aggregate(sumofmembers~ Band,SumbyCategory,mean)
+  
+#### Calculating standard deviation for Band
+  
+aggregate(sumofmembers~ Band,SumbyCategory,sd)
+
+
+#Boxplot
+
+ggplot(SumbyCategory, aes(y = sumofmembers/1000, x = Band)) +
+geom_boxplot( alpha = 0.7,notch=FALSE,fill=(c("gold","darkgreen","red"))) +
+labs (y = "Sum of members", x = "Band", title = "Boxplot ")
+        
+
+
+
+###  ANOVA TEST   
+
+library(FSA)   
+Summarize(sumofmembers~Band,
+           data=SumbyCategory,
+           digits=3)
+
+########### USING LM METHOD #############
+
+model = lm(sumofmembers~Band, 
+           data=SumbyCategory)
+summary(model)
+
+######### PLOTING BOXPLOT ##############
+
+boxplot(SumbyCategory$sumofmembers~SumbyCategory$Band)
+
+######### USING ONE WAY ANOVA ############
+
+model <- aov(SumbyCategory$sumofmembers~SumbyCategory$Band)
+summary(model)
+
+
+######### TUKEY - Pairwise Comparision 
+
+TukeyHSD(model)
+plot(TukeyHSD(model))
+
+######## HISTOGRAM of Residuals ###########
+
+hist(residuals(model), col="red")
+
+
+
+
+
+

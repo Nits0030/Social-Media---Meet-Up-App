@@ -1,7 +1,14 @@
-#RSCRIPT FOR ANOVA-TEST  ON MEETUP DATASET 
+## R PRogram FOR ANOVA-TEST  ON MEETUP DATASET 
 
-## Loading libraries required and reading the data into R
+title: "R Notebook"
+output: html_notebook
+Author : 'Nikki Sharma'
+---
 
+
+
+#Loading libraries required and reading the data into R
+```{r, message=FALSE, warning=FALSE}
 library(knitr)
 library(dplyr)
 library(readr)
@@ -15,160 +22,260 @@ library(ggrepel)
 library(leaflet)
 library(rgdal)
 library(plotly)
+library(tidyr)
+```
 
-## installing packages for SQL
+#installing packages for SQL
 
 install.packages("RMySQL")
 library(RMySQL)
 
 
-## To connect , using dbConnect() function:
+#To connect , using dbConnect() function:
 
 con=dbConnect(MySQL(),
-              user='awsbigdata',password= "bigdata123",
+              user='#####',password= "#########",
               dbname = 'Social',host='aws.c0cy2sgqhaev.us-east-1.rds.amazonaws.com')
 
 
 
-## Import Meetup data into the new meetup table
+#Import Meetup data into the new meetup table
 
 result = dbSendQuery(con,"SELECT * FROM meetup")
 
-## store the result and fetches all of the records
+#store the result and fetches all of the records
 
 df = fetch(result, n = -1)
 print(df)
 
 
-## COunt of accounts created by Year& quarter
+#Reading the data 
+```{r}
+df <- read.csv("C:/Users/13055/Downloads/meetup.csv")
+```
+
+```{r}
+head(df)
+```
+#COunt of accounts created by Year, months and weekdays
+```{r}
 
 df$year <- year(df$created) 
 
-p <-df%>%ggplot(aes(x=as.factor(year))) + geom_bar(stat='count', fill=rainbow(16)) +
-        geom_label(stat = "count", aes(label = ..count.., y = ..count..))+ 
-  labs(x = "Year" , y = "Count", title= "Total No of Members by Year")
-p
+df %>%
+        ggplot(aes(x=as.factor(year))) + geom_bar(stat='count', fill=rainbow(16)) +
+        geom_label(stat = "count", aes(label = ..count.., y = ..count..))+ labs(x = "Year" , y = "Count", title= "Total No of Members by Year")
 
-## COunts of accounts created under Category by Quarter
-
+```
+#Quarter
+```{r}
 df$quarter <- quarter(df$created) #extract Quarters from created
 
 q1 <- df %>% filter(year>=2006)%>% select(year, quarter) %>% group_by(year) %>% count(quarter) %>%
         ggplot(aes(x=as.factor(quarter), y=n)) + geom_bar(stat='identity', fill= topo.colors(48)) +
         facet_wrap(.~year, ncol= 4) + labs(x='Quarter', y='Count ') +
   labs(x = "Year" , y = "Count", title= "Total No of Members by Quarter") 
+  
 q1
 
-### COunt of Categories & group 
-## Categories in Meet up
+```
 
+# Categories in Meet up
+```{r}
 df %>% count(category) %>% top_n(33, wt=n) %>%
         ggplot(aes(x=reorder(category, n), y=n)) +
         geom_bar(stat='identity', fill= topo.colors(33)) +
         coord_flip() + labs(x=' Category', y='Count',title = ' Count of Groups by category')
+ 
+```
 
 
-## Top 3 category 
+#Top 10 category 
+```{r}
 df %>% count(category) %>% top_n(3, wt=n) %>%
         ggplot(aes(x=reorder(category, n), y=n)) +
         geom_bar(stat='identity', fill= cm.colors(3)) +
         coord_flip() + labs(x=' Category', y='Count of Category',title = ' Category Group')
   
+```
 
-
-## Memeber count by State
-
+#Memeber count by State
+```{r}
 summary_members <- df %>%
                            group_by(state)%>%
                            summarize(number = sum(members, na.rm = TRUE))
 summary_members
-
-### Sum of Members by state being registered  
-
-##Count of members by state
-
-##PIE Charts
-
-p1 <- ggplot(data=summary_members,mapping = aes(x="",y=number,fill=state))+
-  geom_bar(width = 1,stat = "identity",color="black")+
-  scale_y_sqrt()+
-  theme_classic()+theme(axis.line = element_blank(),axis.text = element_blank())+
-  geom_text(aes(label = paste0(number)), position = position_stack(vjust = 0.5),color="white")+
-  xlab("")+
-  ylab("")
-p1
-pie_slice= p1 +coord_polar("y",start = 0)
-pie_slice
-
-
-## Count of categories  by all state 
-
-StateCount <- subset(df, state == "NY"|state == "CA"|state =="IL"|state == "NJ", select = c(state, category,members))
-p <-ggplot(data = StateCount, mapping = aes(y = state, x = as.factor(category)))+ coord_flip()+
-  geom_bar(stat='identity',fill = topo.colors(16330)) + labs(x = 'Count of Category',y = " ", title = "Category count by state")
-   +facet_wrap(~state, ncol= 4) 
-
+```
+#sum of members by state being registered
+```{r}
+p <-ggplot(data = summary_members, mapping = aes(x = state, y = as.factor(number)))+
+    geom_col(fill = topo.colors(4)) + labs(x = 'state', y = "Members count in Millions", title = "Total no of members by state")
 p
+```
+```{r}
 
-## CREATING GROUPS FOR ANALYSIS   
-## Band Variable based on category
 
+#Numbers are on sclice
+p3 <- ggplot(data=summary_members,mapping = aes(x="",y=number,fill=state))+
+      geom_bar(width = 1,stat = "identity",color="black")+
+      scale_y_sqrt()+
+      theme_classic()+theme(axis.line = element_blank(),axis.text = element_blank())+
+      geom_text(aes(label = paste0(number)), position = position_stack(vjust = 0.5),color="white")+
+      xlab("")+
+      ylab("")
+p3
+pie_slice= p3 +coord_polar("y",start = 0)
+pie_slice
+```
+
+# sum of members by category 
+```{r}
+SumbyCategory <- df %>% group_by(category) %>% summarize(sumofmembers=sum(members))
+head(SumbyCategory)
+```
+#category by Total no of members
+```{r}
+      SumbyCategory%>%ggplot(aes(x=reorder(category, sumofmembers), y= as.factor(sumofmembers))) + geom_bar(stat='identity',   fill = rainbow(33)) + coord_flip()+
+        labs(x='Category', y='Total # of Members', title = 'Total # Memebers by Category') + 
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+```
+
+
+
+#PIE Charts
+```{r}
+pie <- p + coord_polar("y", start=0)
+pie
+```
+
+```{r}
+ggplot(summary_members, aes(x= as.factor(number),fill = state))+
+  geom_bar(width = 1)+
+  coord_polar("y",start = 0) +
+   transition_states(state,
+    transition_length = 2,
+    state_length = 1) +
+  enter_fade() + 
+  exit_shrink() +
+  ease_aes('sine-in-out')
+```
+
+
+#MAP
+```{r}
+#df %>% count(category.name) %>% top_n(10, wt=n) %>%
+
+TopMap <- df%>%select(lat, lon, members, state)
+labels <- paste0("<strong>City: </strong>", TopMap$state, 
+                
+                 "<br><strong>Members </strong>", TopMap$members) %>% lapply(htmltools::HTML)
+
+
+leaflet(TopMap) %>%
+        setView(lng=-74, lat=37.8, zoom=3) %>%
+        addTiles() %>%
+        addProviderTiles("Esri.NatGeoWorldMap") %>%
+       addMarkers(lng  = ~lon, lat = ~lat,
+             popup = ~members)
+
+```
+
+##################################ANOVA#########################################################
+
+# Band Variable based on category
+```{r}
 SumbyCategory$Band[SumbyCategory$sumofmembers >= 750000] <- 'High'
 SumbyCategory$Band [SumbyCategory$sumofmembers > 200000 & SumbyCategory$sumofmembers < 750000 ] <-'Medium'
 SumbyCategory$Band [SumbyCategory$sumofmembers < 200000] <- 'Low'
 head(SumbyCategory)
+```
+```{r}
+p <-ggplot(data = SumbyCategory, mapping = aes(y = as.factor(Band), x = category))+
+    geom_col(fill = topo.colors(33)) + labs(x = 'state', y = "Members count in Millions", title = "Total no of members by state") +coord_flip()
+p
 
-#### calculating the mean for the Band
-  
-aggregate(sumofmembers~ Band,SumbyCategory,mean)
-  
-#### Calculating standard deviation for Band
-  
-aggregate(sumofmembers~ Band,SumbyCategory,sd)
-
-
-#Boxplot
-
-ggplot(SumbyCategory, aes(y = sumofmembers/1000, x = Band)) +
-geom_boxplot( alpha = 0.7,notch=FALSE,fill=(c("gold","darkgreen","red"))) +
-labs (y = "Sum of members", x = "Band", title = "Boxplot ")
-        
+```
 
 
-
-###  ANOVA TEST   
-
+```{r}
 library(FSA)   
 Summarize(sumofmembers~Band,
            data=SumbyCategory,
            digits=3)
+```
 
-########### USING LM METHOD #############
 
+```{r}
 model = lm(sumofmembers~Band, 
            data=SumbyCategory)
 summary(model)
+plot(model)
+```
 
-######### PLOTING BOXPLOT ##############
+#Boxplot
 
-boxplot(SumbyCategory$sumofmembers~SumbyCategory$Band)
+```{r}
+library(ggplot2)
 
-######### USING ONE WAY ANOVA ############
+ggplot(SumbyCategory, aes(y = sumofmembers/1000, x = Band)) +
+        geom_boxplot( alpha = 0.7,notch=FALSE,fill=(c("gold","darkgreen","red"))) +
+        labs (y = "Sum of members", x = "Band", title = "Boxplot ")+coord_flip()
+boxplot(SumbyCategory$sumofmembers~SumbyCategory$Band,col=(c("gold","darkgreen","red")),xlab = "Band", ylab = "Total No of members",main = "Boxplot")
+```
 
-model <- aov(SumbyCategory$sumofmembers~SumbyCategory$Band)
-summary(model)
-
-
-######### TUKEY - Pairwise Comparision 
-
-TukeyHSD(model)
-plot(TukeyHSD(model))
-
-######## HISTOGRAM of Residuals ###########
-
-hist(residuals(model), col="red")
+#ANOVA
+```{r}
+model1<- aov(SumbyCategory$sumofmembers~SumbyCategory$Band)
+summary(model1)
+```
 
 
+#TUKEY
+```{r}
+TukeyHSD(model1)
+plot(TukeyHSD(model1))
+```
+
+
+```{r}
+library(gplots)
+plotmeans(SumbyCategory$sumofmembers/100~SumbyCategory$Band)
+```
+
+```{r}
+hist(residuals(model), 
+     col="darkgray")
+```
+
+#statewise - NY 
+```{r}
+NYCount <- subset(df, state == "NY", select = c(state, category,members))
+```
+
+```{r}
+p <-ggplot(data = NYCount, mapping = aes(y = state, x = as.factor(category)))+ coord_flip()+
+    geom_col(fill = topo.colors(8565) ) + labs(x = 'COunt of NY state', y = "Members count in Millions", title = "Total no of category count by NY state")
+p
+```
+#statewise - CA 
+```{r}
+NYCount <- subset(df, state == "CA", select = c(state, category,members))
+```
+
+```{r}
+p <-ggplot(data = NYCount, mapping = aes(y = state, x = as.factor(category)))+ coord_flip()+
+    geom_col(fill = topo.colors(4574) ) + labs(x = 'COunt of CA state', y = "Members count in Millions", title = "Total no of category count by NY state")
+p
+```
+
+
+```{r}
+StateCount <- subset(df, state == "NY"|state == "CA"|state =="IL"|state == "NJ", select = c(state, category,members))
+p <-ggplot(data = StateCount, mapping = aes(y = state, x = as.factor(category)))+ coord_flip()+
+    geom_bar(stat='identity',fill = topo.colors(16330)) + labs(x = 'Count of Category',y = " ", title = "Category count by state")+facet_wrap(~state, ncol= 4) 
+
+p
+```
 
 
 
